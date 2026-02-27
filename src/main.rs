@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{extract::State, routing::get, Json, Router};
 use tower_http::services::ServeFile;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -41,10 +41,16 @@ async fn main() {
         .route("/ws/stream", get(handlers::stream::ws_stream_handler))
         .route("/ws/view", get(handlers::view::ws_view_handler))
         .route("/health", get(|| async { "ok" }))
+        .route("/streams", get(list_streams))
         .route_service("/blocklist.txt", ServeFile::new("blocklist.txt"))
         .with_state(state);
 
     tracing::info!("listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn list_streams(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
+    let sessions = state.sessions.read().await;
+    Json(sessions.keys().cloned().collect())
 }
